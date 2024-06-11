@@ -5,13 +5,15 @@ const express = require('express');
 const app = express();
 const mongoose = require('mongoose');
 const port = 8080;
-const MONGO_URL = "mongodb://localhost:27017/VoyageVilla";
+
+const dbUrl=process.env.ATLASDB_URL;
 
 const listingRouter=require('./routes/listing.js');
 const reviewRouter=require('./routes/reviews.js');
 const userRouter=require('./routes/user.js');
 
 const ExpressError=require("./utils/ExpressError.js");
+const MongoStore = require('connect-mongo');
 const session=require('express-session');
 const flash=require('connect-flash');
 
@@ -29,8 +31,15 @@ main().then(() => {
 }).catch((err) => {
     console.log(err);
 })
+// async function main() {
+//     await mongoose.connect(dbUrl);
+// }
+
 async function main() {
-    await mongoose.connect(MONGO_URL);
+    await mongoose.connect(dbUrl, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+    });
 }
 
 
@@ -41,8 +50,23 @@ app.use(methodOverride("_method"));
 app.engine("ejs", ejsMate);
 app.use(express.static(path.join(__dirname, "/public")));
 
+
+const store=MongoStore.create({
+    mongoUrl:dbUrl,
+    crypto:{
+        secret: process.env.SECRET,
+    },
+    touchAfter:24*3600,
+});
+store.on("error",(err)=>{
+    console.log("ERROR in MONGO SESSION STORE",err);
+});
+
+
+
 const sessionOptions={
-    secret:"ThalaForAReason",
+    store,
+    secret: process.env.SECRET,
     resave:false,
     saveUninitialized:true,
     cookie:{
@@ -55,6 +79,7 @@ const sessionOptions={
 // app.get("/", (req, res) => {
 //     res.send("Hi I am marcos")
 // });
+
 
 app.use(session(sessionOptions));
 app.use(flash());
